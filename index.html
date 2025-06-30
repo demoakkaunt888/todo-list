@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoList - Clean & Efficient</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Lexend', sans-serif; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-2xl">
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">My TodoList</h1>
+            <p class="text-gray-600">Stay organized, stay focused</p>
+        </header>
+
+        <!-- Add Todo Form -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div class="flex gap-3">
+                <input 
+                    type="text" 
+                    id="todoInput" 
+                    placeholder="What needs to be done?" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxlength="100"
+                >
+                <button 
+                    id="addBtn" 
+                    class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+                >
+                    Add Task
+                </button>
+            </div>
+        </div>
+
+        <!-- Filter Buttons -->
+        <div class="flex justify-center gap-2 mb-6">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="active">Active</button>
+            <button class="filter-btn" data-filter="completed">Completed</button>
+        </div>
+
+        <!-- Todo List Container -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div id="todoList" class="divide-y divide-gray-100">
+                <!-- Todos will be dynamically inserted here -->
+            </div>
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-12 text-gray-500">
+                <div class="text-6xl mb-4">📝</div>
+                <p class="text-lg">No tasks yet. Add one above!</p>
+            </div>
+        </div>
+
+        <!-- Footer Stats -->
+        <div class="mt-6 text-center">
+            <p class="text-gray-600">
+                <span id="activeCount">0</span> active • 
+                <span id="completedCount">0</span> completed • 
+                <span id="totalCount">0</span> total
+            </p>
+            <button 
+                id="clearCompleted" 
+                class="mt-2 text-red-600 hover:text-red-800 transition-colors text-sm font-medium"
+                style="display: none;"
+            >
+                Clear Completed
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // TodoList Class - Main application logic
+        class TodoList {
+            constructor() {
+                this.todos = this.loadFromStorage();
+                this.currentFilter = 'all';
+                this.initializeElements();
+                this.attachEventListeners();
+                this.render();
+            }
+
+            // Initialize DOM element references
+            initializeElements() {
+                this.todoInput = document.getElementById('todoInput');
+                this.addBtn = document.getElementById('addBtn');
+                this.todoList = document.getElementById('todoList');
+                this.emptyState = document.getElementById('emptyState');
+                this.filterBtns = document.querySelectorAll('.filter-btn');
+                this.activeCount = document.getElementById('activeCount');
+                this.completedCount = document.getElementById('completedCount');
+                this.totalCount = document.getElementById('totalCount');
+                this.clearCompleted = document.getElementById('clearCompleted');
+            }
+
+            // Attach all event listeners
+            attachEventListeners() {
+                // Add todo on button click
+                this.addBtn.addEventListener('click', () => this.addTodo());
+                
+                // Add todo on Enter key press
+                this.todoInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.addTodo();
+                });
+
+                // Filter button clicks
+                this.filterBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => this.setFilter(e.target.dataset.filter));
+                });
+
+                // Clear completed todos
+                this.clearCompleted.addEventListener('click', () => this.clearCompletedTodos());
+            }
+
+            // Load todos from localStorage
+            loadFromStorage() {
+                try {
+                    const stored = localStorage.getItem('todos');
+                    return stored ? JSON.parse(stored) : [];
+                } catch (error) {
+                    console.warn('Failed to load todos from storage:', error);
+                    return [];
+                }
+            }
+
+            // Save todos to localStorage
+            saveToStorage() {
+                try {
+                    localStorage.setItem('todos', JSON.stringify(this.todos));
+                } catch (error) {
+                    console.warn('Failed to save todos to storage:', error);
+                }
+            }
+
+            // Generate unique ID for new todos
+            generateId() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2);
+            }
+
+            // Add new todo item
+            addTodo() {
+                const text = this.todoInput.value.trim();
+                
+                if (!text) {
+                    this.todoInput.focus();
+                    return;
+                }
+
+                const newTodo = {
+                    id: this.generateId(),
+                    text: text,
+                    completed: false,
+                    createdAt: new Date().toISOString()
+                };
+
+                this.todos.unshift(newTodo); // Add to beginning of array
+                this.todoInput.value = '';
+                this.saveToStorage();
+                this.render();
+                this.todoInput.focus(); // Keep focus for continuous adding
+            }
+
+            // Toggle todo completion status
+            toggleTodo(id) {
+                const todo = this.todos.find(t => t.id === id);
+                if (todo) {
+                    todo.completed = !todo.completed;
+                    this.saveToStorage();
+                    this.render();
+                }
+            }
+
+            // Delete todo item
+            deleteTodo(id) {
+                this.todos = this.todos.filter(t => t.id !== id);
+                this.saveToStorage();
+                this.render();
+            }
+
+            // Edit todo text
+            editTodo(id, newText) {
+                const todo = this.todos.find(t => t.id === id);
+                if (todo && newText.trim()) {
+                    todo.text = newText.trim();
+                    this.saveToStorage();
+                    this.render();
+                }
+            }
+
+            // Set current filter
+            setFilter(filter) {
+                this.currentFilter = filter;
+                
+                // Update filter button states
+                this.filterBtns.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === filter);
+                });
+                
+                this.render();
+            }
+
+            // Get filtered todos based on current filter
+            getFilteredTodos() {
+                switch (this.currentFilter) {
+                    case 'active':
+                        return this.todos.filter(t => !t.completed);
+                    case 'completed':
+                        return this.todos.filter(t => t.completed);
+                    default:
+                        return this.todos;
+                }
+            }
+
+            // Clear all completed todos
+            clearCompletedTodos() {
+                this.todos = this.todos.filter(t => !t.completed);
+                this.saveToStorage();
+                this.render();
+            }
+
+            // Create HTML for a single todo item
+            createTodoHTML(todo) {
+                return `
+                    <div class="flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors group">
+                        <button 
+                            class="todo-toggle w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                todo.completed 
+                                    ? 'bg-green-500 border-green-500 text-white' 
+                                    : 'border-gray-300 hover:border-green-400'
+                            }"
+                            data-id="${todo.id}"
+                        >
+                            ${todo.completed ? '✓' : ''}
+                        </button>
+                        
+                        <span 
+                            class="todo-text flex-1 ${
+                                todo.completed 
+                                    ? 'line-through text-gray-500' 
+                                    : 'text-gray-800'
+                            } cursor-pointer"
+                            data-id="${todo.id}"
+                        >
+                            ${this.escapeHtml(todo.text)}
+                        </span>
+                        
+                        <button 
+                            class="todo-delete opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-800 transition-all p-1 rounded"
+                            data-id="${todo.id}"
+                            title="Delete task"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Escape HTML to prevent XSS
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Update statistics display
+            updateStats() {
+                const active = this.todos.filter(t => !t.completed).length;
+                const completed = this.todos.filter(t => t.completed).length;
+                const total = this.todos.length;
+
+                this.activeCount.textContent = active;
+                this.completedCount.textContent = completed;
+                this.totalCount.textContent = total;
+
+                // Show/hide clear completed button
+                this.clearCompleted.style.display = completed > 0 ? 'inline-block' : 'none';
+            }
+
+            // Main render method
+            render() {
+                const filteredTodos = this.getFilteredTodos();
+                
+                // Show/hide empty state
+                if (filteredTodos.length === 0) {
+                    this.todoList.innerHTML = '';
+                    this.emptyState.style.display = 'block';
+                } else {
+                    this.emptyState.style.display = 'none';
+                    this.todoList.innerHTML = filteredTodos.map(todo => this.createTodoHTML(todo)).join('');
+                    
+                    // Attach event listeners to newly created elements
+                    this.attachTodoEventListeners();
+                }
+                
+                this.updateStats();
+            }
+
+            // Attach event listeners to todo items
+            attachTodoEventListeners() {
+                // Toggle completion
+                this.todoList.querySelectorAll('.todo-toggle').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.toggleTodo(e.target.dataset.id);
+                    });
+                });
+
+                // Delete todo
+                this.todoList.querySelectorAll('.todo-delete').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.deleteTodo(e.target.dataset.id);
+                    });
+                });
+
+                // Edit todo on double click
+                this.todoList.querySelectorAll('.todo-text').forEach(span => {
+                    span.addEventListener('dblclick', (e) => {
+                        this.startEditing(e.target, e.target.dataset.id);
+                    });
+                });
+            }
+
+            // Start editing a todo item
+            startEditing(element, id) {
+                const todo = this.todos.find(t => t.id === id);
+                if (!todo) return;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = todo.text;
+                input.className = 'flex-1 px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500';
+                
+                // Save on Enter or blur
+                const saveEdit = () => {
+                    this.editTodo(id, input.value);
+                };
+                
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') saveEdit();
+                });
+                
+                input.addEventListener('blur', saveEdit);
+                
+                // Replace element with input
+                element.parentNode.replaceChild(input, element);
+                input.focus();
+                input.select();
+            }
+        }
+
+        // CSS for filter buttons
+        const style = document.createElement('style');
+        style.textContent = `
+            .filter-btn {
+                @apply px-4 py-2 rounded-lg font-medium transition-all;
+                @apply bg-gray-100 text-gray-600 hover:bg-gray-200;
+            }
+            .filter-btn.active {
+                @apply bg-blue-600 text-white shadow-md;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Initialize the TodoList application
+        document.addEventListener('DOMContentLoaded', () => {
+            new TodoList();
+        });
+    </script>
+</body>
+</html>
